@@ -1,0 +1,12 @@
+[package]
+name = "loadable_extension_api_wrapper_macro"
+version = "0.1.0"
+authors = ["Joshua C. Randall <jcrandall@alum.mit.edu>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "0.14.4"
+quote = "0.6.3"

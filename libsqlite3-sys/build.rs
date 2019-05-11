@@ -16,17 +16,25 @@ fn main() {
         // This can't be `cfg!` without always requiring our `mod build_bundled` (and thus `cc`)
         #[cfg(feature = "bundled")]
         {
+            if cfg!(feature = "loadable_extension") {
+                panic!("Building a loadable extension bundled is not supported");
+            }
             build_bundled::main(&out_dir, &out_path)
         }
         #[cfg(not(feature = "bundled"))]
         {
-            build_linked::main(&out_dir, &out_path)
+            if cfg!(feature = "loadable_extension") {
+                build_loadable_extension::main(&out_dir, &out_path)
+            } else {
+                build_linked::main(&out_dir, &out_path)
+            }
         }
     }
 }
 
 #[cfg(feature = "bundled")]
 mod build_bundled {
+    use super::header_file;
     use cc;
     use std::path::Path;
 
@@ -39,7 +47,7 @@ mod build_bundled {
         #[cfg(feature = "buildtime_bindgen")]
         {
             use super::{bindings, HeaderLocation};
-            let header = HeaderLocation::FromPath("sqlite3/sqlite3.h".to_owned());
+            let header = HeaderLocation::FromPath(format!("sqlite3/{}", header_file()).to_owned());
             bindings::write_to_out_dir(header, out_path);
         }
         #[cfg(not(feature = "buildtime_bindgen"))]
@@ -93,6 +101,22 @@ fn env_prefix() -> &'static str {
     }
 }
 
+fn header_file() -> &'static str {
+    if cfg!(feature = "loadable_extension") {
+        "sqlite3ext.h"
+    } else {
+        "sqlite3.h"
+    }
+}
+
+fn wrapper_file() -> &'static str {
+    if cfg!(feature = "loadable_extension") {
+        "wrapper-ext.h"
+    } else {
+        "wrapper.h"
+    }
+}
+
 pub enum HeaderLocation {
     FromEnvironment,
     Wrapper,
@@ -108,10 +132,11 @@ impl From<HeaderLocation> for String {
                     "{}_INCLUDE_DIR must be set if {}_LIB_DIR is set",
                     prefix, prefix
                 ));
-                header.push_str("/sqlite3.h");
+                header.push_str("/");
+                header.push_str(header_file());
                 header
             }
-            HeaderLocation::Wrapper => "wrapper.h".into(),
+            HeaderLocation::Wrapper => wrapper_file().into(),
             HeaderLocation::FromPath(path) => path,
         }
     }
@@ -123,7 +148,7 @@ mod build_linked {
     #[cfg(all(feature = "vcpkg", target_env = "msvc"))]
     extern crate vcpkg;
 
-    use super::{bindings, env_prefix, HeaderLocation};
+    use super::{bindings, env_prefix, header_file, HeaderLocation};
     use std::env;
     use std::path::Path;
 
@@ -190,7 +215,7 @@ mod build_linked {
         {
             Ok(mut lib) => {
                 if let Some(mut header) = lib.include_paths.pop() {
-                    header.push("sqlite3.h");
+                    header.push(header_file());
                     HeaderLocation::FromPath(header.to_string_lossy().into())
                 } else {
                     HeaderLocation::Wrapper
@@ -212,7 +237,7 @@ mod build_linked {
         // See if vcpkg can find it.
         if let Ok(mut lib) = vcpkg::Config::new().probe(link_lib()) {
             if let Some(mut header) = lib.include_paths.pop() {
-                header.push("sqlite3.h");
+                header.push(header_file());
                 return Some(HeaderLocation::FromPath(header.to_string_lossy().into()));
             }
         }
@@ -233,6 +258,79 @@ mod build_linked {
     }
 }
 
+mod build_loadable_extension {
+    use pkg_config;
+
+    use super::{bindings, env_prefix, header_file, HeaderLocation};
+    use std::env;
+    use std::path::Path;
+
+    pub fn main(_out_dir: &str, out_path: &Path) {
+        let header = find_sqlite();
+        bindings::write_to_out_dir(header, out_path);
+    }
+
+    // Prints the necessary cargo link commands and returns the path to the header.
+    fn find_sqlite() -> HeaderLocation {
+        let link_lib = "sqlite3";
+
+        println!("cargo:rerun-if-env-changed={}_INCLUDE_DIR", env_prefix());
+        println!("cargo:rerun-if-env-changed={}_LIB_DIR", env_prefix());
+        println!("cargo:rerun-if-env-changed={}_STATIC", env_prefix());
+        if cfg!(target_os = "windows") {
+            println!("cargo:rerun-if-env-changed=PATH");
+        }
+        if cfg!(all(feature = "vcpkg", target_env = "msvc")) {
+            println!("cargo:rerun-if-env-changed=VCPKGRS_DYNAMIC");
+        }
+        // Allow users to specify where to find SQLite.
+        if let Ok(dir) = env::var(format!("{}_LIB_DIR", env_prefix())) {
+            // Try to use pkg-config to determine link commands
+            let pkgconfig_path = Path::new(&dir).join("pkgconfig");
+            env::set_var("PKG_CONFIG_PATH", pkgconfig_path);
+            return HeaderLocation::FromEnvironment;
+        }
+
+        if let Some(header) = try_vcpkg() {
+            return header;
+        }
+
+        // See if pkg-config can do everything for us.
+        match pkg_config::Config::new()
+            .print_system_libs(false)
+            .probe(link_lib)
+        {
+            Ok(mut lib) => {
+                if let Some(mut header) = lib.include_paths.pop() {
+                    header.push(header_file());
+                    HeaderLocation::FromPath(header.to_string_lossy().into())
+                } else {
+                    HeaderLocation::Wrapper
+                }
+            }
+            Err(_) => HeaderLocation::Wrapper,
+        }
+    }
+
+    #[cfg(all(feature = "vcpkg", target_env = "msvc"))]
+    fn try_vcpkg() -> Option<HeaderLocation> {
+        // See if vcpkg can find it.
+        if let Ok(mut lib) = vcpkg::Config::new().probe(link_lib()) {
+            if let Some(mut header) = lib.include_paths.pop() {
+                header.push(header_file());
+                return Some(HeaderLocation::FromPath(header.to_string_lossy().into()));
+            }
+        }
+        None
+    }
+
+    #[cfg(not(all(feature = "vcpkg", target_env = "msvc")))]
+    fn try_vcpkg() -> Option<HeaderLocation> {
+        None
+    }
+
+}
+
 #[cfg(not(feature = "buildtime_bindgen"))]
 mod bindings {
     use super::HeaderLocation;
@@ -241,19 +339,35 @@ mod bindings {
     use std::path::Path;
 
     static PREBUILT_BINDGEN_PATHS: &'static [&'static str] = &[
-        "bindgen-bindings/bindgen_3.6.8.rs",
+        "bindgen-bindings/bindgen_3.6.8",
         #[cfg(feature = "min_sqlite_version_3_6_23")]
-        "bindgen-bindings/bindgen_3.6.23.rs",
+        "bindgen-bindings/bindgen_3.6.23",
         #[cfg(feature = "min_sqlite_version_3_7_7")]
-        "bindgen-bindings/bindgen_3.7.7.rs",
+        "bindgen-bindings/bindgen_3.7.7",
         #[cfg(feature = "min_sqlite_version_3_7_16")]
-        "bindgen-bindings/bindgen_3.7.16.rs",
+        "bindgen-bindings/bindgen_3.7.16",
     ];
 
     pub fn write_to_out_dir(_header: HeaderLocation, out_path: &Path) {
-        let in_path = PREBUILT_BINDGEN_PATHS[PREBUILT_BINDGEN_PATHS.len() - 1];
-        fs::copy(in_path, out_path).expect("Could not copy bindings to output directory");
+        let in_path = format!(
+            "{}{}.rs",
+            PREBUILT_BINDGEN_PATHS[PREBUILT_BINDGEN_PATHS.len() - 1],
+            prebuilt_bindgen_ext()
+        );
+        fs::copy(in_path.to_owned(), out_path).expect(&format!(
+            "Could not copy bindings to output directory from {}",
+            in_path
+        ));
     }
+
+    fn prebuilt_bindgen_ext() -> &'static str {
+        if cfg!(feature = "loadable_extension") {
+            "-ext"
+        } else {
+            ""
+        }
+    }
+
 }
 
 #[cfg(feature = "buildtime_bindgen")]
@@ -298,12 +412,103 @@ mod bindings {
             bindings = bindings.clang_arg("-DSQLITE_ENABLE_SESSION");
         }
 
+        // rust-bindgen does not handle CPP macros that alias functions, so
+        // when using sqlite3ext.h to support loadable extensions, the macros
+        // that attempt to redefine sqlite3 API routines to be redirected through
+        // the global sqlite3_api instance of the sqlite3_api_routines structure
+        // do not result in any code production.
+        //
+        // Here we do an early bindgen run with a whitelist to get the list of
+        // API functions supported by sqlite3_api_routines, set the
+        // corresponding sqlite3 api routine to be blacklisted in the final
+        // bindgen run, and add wrappers for each of the API functions to call
+        // the API through the sqlite3_api global
+        let mut wrappers: String = "".to_owned();
+        #[cfg(feature = "loadable_extension")]
+        {
+            let api_routines_struct_name = "sqlite3_api_routines".to_owned();
+
+            // wrappers.push_str("\n\n// Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)\nuse loadable_extension_api_wrapper_macro::loadable_extension_api_wrapper;\n");
+
+            let early_bindgen_output = bindgen::builder()
+                .header(header.clone())
+                .parse_callbacks(Box::new(SqliteTypeChooser))
+                .rustfmt_bindings(false)
+                .layout_tests(false)
+                .whitelist_type(&api_routines_struct_name)
+                .whitelist_recursively(false)
+                .generate()
+                .expect(&format!("could not run bindgen on header {}", header))
+                .to_string();
+
+            let api_routines_struct =
+                match get_struct_by_name(&early_bindgen_output, &api_routines_struct_name) {
+                    Some(s) => s,
+                    None => {
+                        panic!(
+                            "Failed to find struct {} in early bindgen output",
+                            api_routines_struct_name
+                        );
+                    }
+                };
+
+            // create wrapper for each field in api routines struct
+            for field in &api_routines_struct.fields {
+                let ident = match &field.ident {
+                    Some(ident) => ident,
+                    None => {
+                        panic!("Unexpected anonymous field in sqlite");
+                    }
+                };
+
+                // construct global sqlite api function identifier from field identifier
+                let api_fn_name = format!("sqlite3_{}", ident);
+                let api_fn_ident = syn::Ident::new(&api_fn_name, ident.span());
+
+                // add global sqlite api function name to blacklist for next bindgen run
+                bindings = bindings.blacklist_function(&api_fn_name);
+
+                // generate wrapper function and push it to wrappers string
+                let wrapper_tokens = generate_wrapper(&field.ty, &api_fn_ident);
+                wrappers.push_str(&format!("{}\n", wrapper_tokens.to_string()));
+            }
+        }
+        wrappers.push_str("\n");
+
+        //let tokens = TokenStream::new();
+        //syntax.to_tokens(&tokens);
+        //println!("sqlite3_api_routines tokens: {:#?}", tokens);
+
+        // bindings = bindings.blacklist_function("sqlite3_close");
+        // bindings = bindings.blacklist_function("sqlite3_result_error_nomem");
+        // bindings = bindings.blacklist_function("sqlite3_result_double");
+        // bindings = bindings.blacklist_function("sqlite3_result_text");
+        // bindings = bindings.blacklist_function("sqlite3_free");
+        // bindings = bindings.blacklist_function("sqlite3_result_null");
+        // bindings = bindings.blacklist_function("sqlite3_create_module_v2");
+        // bindings = bindings.blacklist_function("sqlite3_finalize");
+        // bindings = bindings.blacklist_function("sqlite3_mprintf");
+        // bindings = bindings.blacklist_function("sqlite3_result_blob");
+        // bindings = bindings.blacklist_function("sqlite3_result_int64");
+        // bindings = bindings.blacklist_function("sqlite3_result_error_code");
+        // bindings = bindings.blacklist_function("sqlite3_result_error");
+        // bindings = bindings.blacklist_function("sqlite3_result_error_toobig");
+        // bindings = bindings.blacklist_function("sqlite3_declare_vtab");
+        // bindings = bindings.blacklist_function("sqlite3_errmsg");
+        // bindings = bindings.blacklist_function("sqlite3_result_zeroblob");
+
         bindings
             .generate()
             .expect(&format!("could not run bindgen on header {}", header))
             .write(Box::new(&mut output))
             .expect("could not write output of bindgen");
         let mut output = String::from_utf8(output).expect("bindgen output was not UTF-8?!");
+
+        // For loadable extension support, we need to append the wrappers generated above
+        #[cfg(feature = "loadable_extension")]
+        {
+            output.push_str(&wrappers);
+        }
 
         // rusqlite's functions feature ors in the SQLITE_DETERMINISTIC flag when it
         // can. This flag was added in SQLite 3.8.3, but oring it in in prior
@@ -325,4 +530,152 @@ mod bindings {
         file.write_all(output.as_bytes())
             .expect(&format!("Could not write to {:?}", out_path));
     }
+
+    #[cfg(feature = "loadable_extension")]
+    fn get_struct_by_name(bindgen_sources: &str, name: &str) -> Option<syn::ItemStruct> {
+        let file = syn::parse_file(&bindgen_sources).expect("unable to parse early bindgen output");
+
+        for item in &file.items {
+            if let syn::Item::Struct(s) = item {
+                if s.ident == name {
+                    return Some(s.to_owned());
+                }
+            }
+        }
+        return None;
+    }
+
+    #[cfg(feature = "loadable_extension")]
+    fn bare_fn_from_type_path(t: &syn::Type) -> syn::TypeBareFn {
+        let path = match t {
+            syn::Type::Path(tp) => &tp.path,
+            _ => {
+                panic!("type was not a type path");
+            }
+        };
+
+        let mut path_args: Option<syn::PathArguments> = None;
+        for segment in &path.segments {
+            if segment.arguments.is_empty() {
+                continue;
+            }
+            path_args = Some(segment.arguments.to_owned());
+            break;
+        }
+        match path_args {
+            Some(syn::PathArguments::AngleBracketed(p)) => {
+                for gen_arg in p.args {
+                    match gen_arg {
+                        syn::GenericArgument::Type(syn::Type::BareFn(bf)) => {
+                            return bf;
+                        }
+                        _ => {
+                            panic!("parsed type was not a bare function as expected");
+                        }
+                    };
+                }
+            }
+            _ => {
+                panic!("parsed path args were not angle bracketed as expected");
+            }
+        };
+        // match path_args {
+        //     Some(syn::PathArguments::AngleBracketed(p)) => {
+        //         for gen_arg in p.args {
+        //             match gen_arg {
+        //                 syn::GenericArgument::Type(arg_t) => match arg_t {
+        // 		        syn::Type::BareFn(bf) => {
+        //                     	    return bf;
+        // 			},
+        // 			_ => {
+        // 			     panic!("parsed type was not a bare function as expected");
+        // 			},
+        //                 },
+        //                 _ => {
+        //                     panic!("parsed generic argument was not a type as expected");
+        //                 }
+        //             };
+        //         }
+        //     }
+        //     _ => {
+        //         panic!("parsed path args were not angle bracketed as expected");
+        //     }
+        // };
+        panic!("unexpected failure to parse bare function");
+    }
+
+    #[cfg(feature = "loadable_extension")]
+    fn generate_wrapper(
+        syn_type: &syn::Type,
+        api_fn_ident: &syn::Ident,
+    ) -> proc_macro2::TokenStream {
+        use quote::quote;
+
+        // add wrapper macro invocation to be appended to the generated bindings
+        let bare_fn = bare_fn_from_type_path(syn_type);
+        //        println!("bare_fn: {:#?}", bare_fn);
+
+        let wrapper_prototype = syn::parse_file(
+                 "pub fn sqlite3_declare_vtab(
+        	     arg1: ::std::os::raw::c_int,
+    		 ) -> ::std::os::raw::c_int {
+                     println!(\"prototype\");
+                 }")
+        .expect("unable to parse wrapper prototype");
+
+	let wrapper_prototype = match &wrapper_prototype.items[0] {
+	    syn::Item::ForeignMod(m) => m,
+     	    _ => {
+	         panic!("parsed wrapper prototype did not contain Item::ForeignMod as expected");
+	    },
+	};
+
+	let wrapper_prototype = match &wrapper_prototype.items[0] {
+	    syn::ForeignItem::Fn(f) => f,
+	    _ => {
+	        panic!("parsed wrapper prototype did not contain ForeignItem::Fn as expected");
+	    },
+	};
+	
+        // let wrapper_fn_decl = syn::FnDecl{
+        // fn_token: Token![fn],
+        // generics: syn::Generics{},
+        // paren_token: Token![(],
+        // inputs: bare_fn.inputs,
+        // variadic: bare_fn.variadic,
+        // output: bare_fn.output,
+        // };
+
+	let mut wrapper_foreign_item_fn = wrapper_prototype.to_owned();
+	wrapper_foreign_item_fn.ident = api_fn_ident.to_owned();
+//	wrapper_foreign_item_fn.decl.inputs = bare_fn.inputs;
+	wrapper_foreign_item_fn.decl.variadic = bare_fn.variadic;
+	wrapper_foreign_item_fn.decl.output = bare_fn.output;
+	
+        let wrapper_tokens = quote! {
+            #wrapper_foreign_item_fn
+        };
+        return wrapper_tokens;
+    }
 }
+
+//pub fn sqlite3_declare_vtab unsafe extern "C" fn ( arg1 : * mut sqlite3 , arg2 : * const :: std :: os :: raw :: c_char ) -> :: std :: os :: raw :: c_int { println ! ( "#
+//api_fn_name wrapper" ) ; }
+// pub fn sqlite3_declare_vtab(
+//     arg1: *mut sqlite3,
+//     zSQL: *const ::std::os::raw::c_char,
+// ) -> ::std::os::raw::c_int {
+//     println!("sqlite3_declare_vtab wrapper");
+//     unsafe {
+//         if sqlite3_api.is_null() {
+//             panic!("sqlite3_api is null");
+//         }
+//         ((*sqlite3_api)
+//             .declare_vtab
+//             .expect("sqlite3_api contains null pointer for declare_vtab function"))(
+//             arg1, zSQL
+//         )
+//     }
+// }
+//				let field_type = quote!(#field_ty).to_string();
+//				wrappers.push_str(&format!("loadable_extension_api_wrapper!({}, {}, {})\n", api_fn_name, ident, field_type));

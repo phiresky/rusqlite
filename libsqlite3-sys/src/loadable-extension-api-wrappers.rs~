@@ -1,0 +1,249 @@
+pub fn sqlite3_close(arg1: *mut sqlite3) -> ::std::os::raw::c_int {
+    println!("sqlite3_close wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .close
+            .expect("sqlite3_api contains null pointer for close function"))(arg1)
+    }
+}
+pub fn sqlite3_result_error_nomem(arg1: *mut sqlite3_context) {
+    println!("sqlite3_result_error_nomem wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_error_nomem
+            .expect("sqlite3_api contains null pointer for result_error_nomem function"))(
+            arg1
+        )
+    }
+}
+pub fn sqlite3_result_double(arg1: *mut sqlite3_context, arg2: f64) {
+    println!("sqlite3_result_double wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_double
+            .expect("sqlite3_api contains null pointer for result_double function"))(
+            arg1, arg2
+        )
+    }
+}
+pub fn sqlite3_result_text(
+    arg1: *mut sqlite3_context,
+    arg2: *const ::std::os::raw::c_char,
+    arg3: ::std::os::raw::c_int,
+    arg4: ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>,
+) {
+    println!("sqlite3_result_text wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_text
+            .expect("sqlite3_api contains null pointer for result_text function"))(
+            arg1, arg2, arg3, arg4,
+        )
+    }
+}
+pub fn sqlite3_free(arg1: *mut ::std::os::raw::c_void) {
+    println!("sqlite3_free wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .free
+            .expect("sqlite3_api contains null pointer for free function"))(arg1)
+    }
+}
+pub fn sqlite3_result_null(arg1: *mut sqlite3_context) {
+    println!("sqlite3_result_null wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_null
+            .expect("sqlite3_api contains null pointer for result_null function"))(arg1)
+    }
+}
+pub fn sqlite3_create_module_v2(
+    db: *mut sqlite3,
+    zName: *const ::std::os::raw::c_char,
+    p: *const sqlite3_module,
+    pClientData: *mut ::std::os::raw::c_void,
+    xDestroy: ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>,
+) -> ::std::os::raw::c_int {
+    println!("sqlite3_create_module_v2 wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .create_module_v2
+            .expect("sqlite3_api contains null pointer for create_module_v2 function"))(
+            db,
+            zName,
+            p,
+            pClientData,
+            xDestroy,
+        )
+    }
+}
+pub fn sqlite3_finalize(pStmt: *mut sqlite3_stmt) -> ::std::os::raw::c_int {
+    println!("sqlite3_finalize wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .finalize
+            .expect("sqlite3_api contains null pointer for finalize function"))(pStmt)
+    }
+}
+//pub fn sqlite3_mprintf(arg1: *const ::std::os::raw::c_char, ...)
+//        -> *mut ::std::os::raw::c_char {
+//println!("sqlite3_mprintf wrapper");
+//unsafe {
+//if sqlite3_api.is_null() {
+//panic!("sqlite3_api is null");
+//}
+//    ((*sqlite3_api).mprintf.expect("sqlite3_api contains null pointer for mprintf function"))(arg1, ...)
+//    }
+//}
+pub fn sqlite3_mprintf(
+    arg1: *const ::std::os::raw::c_char,
+    arg2: *const ::std::os::raw::c_char,
+) -> *mut ::std::os::raw::c_char {
+    println!("sqlite3_mprintf wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .mprintf
+            .expect("sqlite3_api contains null pointer for mprintf function"))(arg1, arg2)
+    }
+}
+pub fn sqlite3_result_blob(
+    arg1: *mut sqlite3_context,
+    arg2: *const ::std::os::raw::c_void,
+    arg3: ::std::os::raw::c_int,
+    arg4: ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>,
+) {
+    println!("sqlite3_result_blob wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_blob
+            .expect("sqlite3_api contains null pointer for result_blob function"))(
+            arg1, arg2, arg3, arg4,
+        )
+    }
+}
+pub fn sqlite3_result_int64(arg1: *mut sqlite3_context, arg2: sqlite3_int64) {
+    println!("sqlite3_result_int64 wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_int64
+            .expect("sqlite3_api contains null pointer for result_int64 function"))(
+            arg1, arg2
+        )
+    }
+}
+pub fn sqlite3_result_error_code(arg1: *mut sqlite3_context, arg2: ::std::os::raw::c_int) {
+    println!("sqlite3_result_error_code wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_error_code
+            .expect("sqlite3_api contains null pointer for result_error_code function"))(
+            arg1, arg2
+        )
+    }
+}
+pub fn sqlite3_result_error(
+    arg1: *mut sqlite3_context,
+    arg2: *const ::std::os::raw::c_char,
+    arg3: ::std::os::raw::c_int,
+) {
+    println!("sqlite3_result_error wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_error
+            .expect("sqlite3_api contains null pointer for result_error function"))(
+            arg1, arg2, arg3,
+        )
+    }
+}
+pub fn sqlite3_result_error_toobig(arg1: *mut sqlite3_context) {
+    println!("sqlite3_result_error_toobig wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_error_toobig
+            .expect("sqlite3_api contains null pointer for result_error_toobig function"))(
+            arg1
+        )
+    }
+}
+pub fn sqlite3_declare_vtab(
+    arg1: *mut sqlite3,
+    zSQL: *const ::std::os::raw::c_char,
+) -> ::std::os::raw::c_int {
+    println!("sqlite3_declare_vtab wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .declare_vtab
+            .expect("sqlite3_api contains null pointer for declare_vtab function"))(
+            arg1, zSQL
+        )
+    }
+}
+pub fn sqlite3_errmsg(arg1: *mut sqlite3) -> *const ::std::os::raw::c_char {
+    println!("sqlite3_errmsg wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .errmsg
+            .expect("sqlite3_api contains null pointer for errmsg function"))(arg1)
+    }
+}
+pub fn sqlite3_result_zeroblob(arg1: *mut sqlite3_context, n: ::std::os::raw::c_int) {
+    println!("sqlite3_result_zeroblob wrapper");
+    unsafe {
+        if sqlite3_api.is_null() {
+            panic!("sqlite3_api is null");
+        }
+        ((*sqlite3_api)
+            .result_zeroblob
+            .expect("sqlite3_api contains null pointer for result_zeroblob function"))(
+            arg1, n
+        )
+    }
+}
