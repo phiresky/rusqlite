@@ -428,13 +428,15 @@ mod bindings {
         {
             let api_routines_struct_name = "sqlite3_api_routines".to_owned();
 
-	    wrappers.push_str("
+            wrappers.push_str(
+                "
 
 #[no_mangle]
 pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
 
 // Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)
-");
+",
+            );
 
             let early_bindgen_output = bindgen::builder()
                 .header(header.clone())
@@ -466,7 +468,7 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
                         panic!("Unexpected anonymous field in sqlite");
                     }
                 };
-		let field_type = &field.ty;
+                let field_type = &field.ty;
 
                 // construct global sqlite api function identifier from field identifier
                 let api_fn_name = format!("sqlite3_{}", ident);
@@ -475,8 +477,8 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
                 bindings = bindings.blacklist_function(&api_fn_name);
 
                 // generate wrapper function and push it to wrappers string
-                let wrapper_tokens = generate_wrapper(ident, field_type, &api_fn_name);
-                wrappers.push_str(&format!("{}\n", wrapper_tokens.to_string()));
+                let wrapper = generate_wrapper(ident, field_type, &api_fn_name);
+                wrappers.push_str(&wrapper);
             }
         }
         wrappers.push_str("\n");
@@ -593,42 +595,73 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
         field_ident: &syn::Ident,
         syn_type: &syn::Type,
         api_fn_name: &str,
-    ) -> proc_macro2::TokenStream {
+    ) -> String {
         use quote::quote;
-
-	let field_name = field_ident.to_string();
+	use syn::Token;
+	
+        let field_name = field_ident.to_string();
         let api_fn_ident = syn::Ident::new(&api_fn_name, field_ident.span());
 
         // add wrapper macro invocation to be appended to the generated bindings
         let bare_fn = bare_fn_from_type_path(syn_type);
-	let api_fn_inputs = &bare_fn.inputs;
-	let api_fn_output = &bare_fn.output;
+        let api_fn_output = &bare_fn.output;
 
-	let api_fn_input_idents: Vec<&syn::Ident> = api_fn_inputs.into_iter().map(|input| {
-					      match &input.name {
-					          Some((syn::BareFnArgName::Named(ident), _)) => ident,
-						  _ => {
-						      panic!("Input has no name {:#?}", input);
-						  }
-					      }
-	}).collect();
-	// println!("api_fn_inputs: {:#?}", api_fn_inputs);
-	// println!("api_fn_input_idents: {:#?}", api_fn_input_idents);
+	// string to gather up the wrapper (or multiple in case of variadic) 
+	let mut wrapper = String::new();
 
-        let wrapper_tokens = quote! {
-            pub fn #api_fn_ident(#api_fn_inputs) #api_fn_output {
-	        println!(stringify!(#api_fn_name " wrapper"));
-		unsafe {
-                    if sqlite3_api.is_null() {
-            	        panic!("sqlite3_api is null");
-        	    }
-        	    ((*sqlite3_api).#field_ident
-            	    .expect(stringify!("sqlite3_api contains null pointer for ", #field_name, " function")))(
-            	        #(#api_fn_input_idents),*
-        	    )
-		}
-	    }
+        let max_var_args = match bare_fn.variadic {
+            Some(_) => 8,
+            None => 0,
         };
-        return wrapper_tokens;
+        println!(
+            "will add {} extra wrappers with additional args for variadic {}",
+            max_var_args, api_fn_name
+        );
+        for extra_args in 0..=max_var_args {
+            // prepare inputs
+            let mut api_fn_inputs = bare_fn.inputs.clone();
+	    for extra_arg_n in 0..extra_args {
+	    	let mut input = api_fn_inputs[api_fn_inputs.len()-1].clone();
+		let input_name = match &input.name {
+ 		    Some((syn::BareFnArgName::Named(ident), _)) => {
+		       format!("{}_{}", ident.to_string(), extra_arg_n)
+		    },
+                    _ => {
+                        panic!("Input has no name {:#?}", input);
+                    }
+		};
+		let input_ident = syn::Ident::new(&input_name, field_ident.span());
+		let colon = Token![:](field_ident.span());
+		input.name = Some((syn::BareFnArgName::Named(input_ident), colon));
+		
+  	        api_fn_inputs.push(input);
+            }
+            let api_fn_input_idents: Vec<syn::Ident> = (&api_fn_inputs)
+                .into_iter()
+                .map(|input| match &input.name {
+                    Some((syn::BareFnArgName::Named(ident), _)) => ident.to_owned(),
+                    _ => {
+                        panic!("Input has no name {:#?}", input);
+                    }
+                })
+                .collect();
+
+            let wrapper_tokens = quote! {
+                pub fn #api_fn_ident(#api_fn_inputs) #api_fn_output {
+                println!(stringify!(#api_fn_name " wrapper"));
+            unsafe {
+                        if sqlite3_api.is_null() {
+                            panic!("sqlite3_api is null");
+                    }
+                    ((*sqlite3_api).#field_ident
+                        .expect(stringify!("sqlite3_api contains null pointer for ", #field_name, " function")))(
+                            #(#api_fn_input_idents),*
+                    )
+            }
+            }
+            };
+            wrapper.push_str(&format!("{}\n\n", wrapper_tokens.to_string()));
+        }
+        return wrapper;
     }
 }
