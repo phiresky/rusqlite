@@ -1,3 +1,24 @@
+// Copyright (c) 2014 John Gallagher <johnkgallagher@gmail.com>
+// Copyright (c) 2019 Genomics plc
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 use std::env;
 use std::path::Path;
 
@@ -483,28 +504,6 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
         }
         wrappers.push_str("\n");
 
-        //let tokens = TokenStream::new();
-        //syntax.to_tokens(&tokens);
-        //println!("sqlite3_api_routines tokens: {:#?}", tokens);
-
-        // bindings = bindings.blacklist_function("sqlite3_close");
-        // bindings = bindings.blacklist_function("sqlite3_result_error_nomem");
-        // bindings = bindings.blacklist_function("sqlite3_result_double");
-        // bindings = bindings.blacklist_function("sqlite3_result_text");
-        // bindings = bindings.blacklist_function("sqlite3_free");
-        // bindings = bindings.blacklist_function("sqlite3_result_null");
-        // bindings = bindings.blacklist_function("sqlite3_create_module_v2");
-        // bindings = bindings.blacklist_function("sqlite3_finalize");
-        // bindings = bindings.blacklist_function("sqlite3_mprintf");
-        // bindings = bindings.blacklist_function("sqlite3_result_blob");
-        // bindings = bindings.blacklist_function("sqlite3_result_int64");
-        // bindings = bindings.blacklist_function("sqlite3_result_error_code");
-        // bindings = bindings.blacklist_function("sqlite3_result_error");
-        // bindings = bindings.blacklist_function("sqlite3_result_error_toobig");
-        // bindings = bindings.blacklist_function("sqlite3_declare_vtab");
-        // bindings = bindings.blacklist_function("sqlite3_errmsg");
-        // bindings = bindings.blacklist_function("sqlite3_result_zeroblob");
-
         bindings
             .generate()
             .expect(&format!("could not run bindgen on header {}", header))
@@ -632,7 +631,6 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
                 input.name = Some((syn::BareFnArgName::Named(input_ident), colon));
                 match var_arg_type.to_owned() {
                     Some(t) => {
-                        //		    println!("assigning type {:#?} to input {:#?}", t, input);
                         input.ty = t;
                     }
                     None => {}
@@ -655,15 +653,14 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
         // generate wrapper and return it as a string
         let wrapper_tokens = quote! {
             pub unsafe fn #api_fn_ident(#api_fn_inputs) #api_fn_output {
-            println!(stringify!(#api_fn_name " wrapper"));
-                    if sqlite3_api.is_null() {
-                        panic!("sqlite3_api is null");
+                if sqlite3_api.is_null() {
+                    panic!("sqlite3_api is null");
                 }
                 ((*sqlite3_api).#field_ident
                     .expect(stringify!("sqlite3_api contains null pointer for ", #field_name, " function")))(
                         #(#api_fn_input_idents),*
                 )
-        }
+            }
         };
         return format!("{}\n\n", wrapper_tokens.to_string());
     }
