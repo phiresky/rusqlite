@@ -428,7 +428,13 @@ mod bindings {
         {
             let api_routines_struct_name = "sqlite3_api_routines".to_owned();
 
-            // wrappers.push_str("\n\n// Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)\nuse loadable_extension_api_wrapper_macro::loadable_extension_api_wrapper;\n");
+	    wrappers.push_str("
+
+#[no_mangle]
+pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
+
+// Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)
+");
 
             let early_bindgen_output = bindgen::builder()
                 .header(header.clone())
@@ -460,16 +466,16 @@ mod bindings {
                         panic!("Unexpected anonymous field in sqlite");
                     }
                 };
+		let field_type = &field.ty;
 
                 // construct global sqlite api function identifier from field identifier
                 let api_fn_name = format!("sqlite3_{}", ident);
-                let api_fn_ident = syn::Ident::new(&api_fn_name, ident.span());
 
                 // add global sqlite api function name to blacklist for next bindgen run
                 bindings = bindings.blacklist_function(&api_fn_name);
 
                 // generate wrapper function and push it to wrappers string
-                let wrapper_tokens = generate_wrapper(&field.ty, &api_fn_ident);
+                let wrapper_tokens = generate_wrapper(ident, field_type, &api_fn_name);
                 wrappers.push_str(&format!("{}\n", wrapper_tokens.to_string()));
             }
         }
@@ -579,103 +585,50 @@ mod bindings {
                 panic!("parsed path args were not angle bracketed as expected");
             }
         };
-        // match path_args {
-        //     Some(syn::PathArguments::AngleBracketed(p)) => {
-        //         for gen_arg in p.args {
-        //             match gen_arg {
-        //                 syn::GenericArgument::Type(arg_t) => match arg_t {
-        // 		        syn::Type::BareFn(bf) => {
-        //                     	    return bf;
-        // 			},
-        // 			_ => {
-        // 			     panic!("parsed type was not a bare function as expected");
-        // 			},
-        //                 },
-        //                 _ => {
-        //                     panic!("parsed generic argument was not a type as expected");
-        //                 }
-        //             };
-        //         }
-        //     }
-        //     _ => {
-        //         panic!("parsed path args were not angle bracketed as expected");
-        //     }
-        // };
         panic!("unexpected failure to parse bare function");
     }
 
     #[cfg(feature = "loadable_extension")]
     fn generate_wrapper(
+        field_ident: &syn::Ident,
         syn_type: &syn::Type,
-        api_fn_ident: &syn::Ident,
+        api_fn_name: &str,
     ) -> proc_macro2::TokenStream {
         use quote::quote;
 
+	let field_name = field_ident.to_string();
+        let api_fn_ident = syn::Ident::new(&api_fn_name, field_ident.span());
+
         // add wrapper macro invocation to be appended to the generated bindings
         let bare_fn = bare_fn_from_type_path(syn_type);
-        //        println!("bare_fn: {:#?}", bare_fn);
+	let api_fn_inputs = &bare_fn.inputs;
+	let api_fn_output = &bare_fn.output;
 
-        let wrapper_prototype = syn::parse_file(
-                 "pub fn sqlite3_declare_vtab(
-        	     arg1: ::std::os::raw::c_int,
-    		 ) -> ::std::os::raw::c_int {
-                     println!(\"prototype\");
-                 }")
-        .expect("unable to parse wrapper prototype");
+	let api_fn_input_idents: Vec<&syn::Ident> = api_fn_inputs.into_iter().map(|input| {
+					      match &input.name {
+					          Some((syn::BareFnArgName::Named(ident), _)) => ident,
+						  _ => {
+						      panic!("Input has no name {:#?}", input);
+						  }
+					      }
+	}).collect();
+	// println!("api_fn_inputs: {:#?}", api_fn_inputs);
+	// println!("api_fn_input_idents: {:#?}", api_fn_input_idents);
 
-	let wrapper_prototype = match &wrapper_prototype.items[0] {
-	    syn::Item::ForeignMod(m) => m,
-     	    _ => {
-	         panic!("parsed wrapper prototype did not contain Item::ForeignMod as expected");
-	    },
-	};
-
-	let wrapper_prototype = match &wrapper_prototype.items[0] {
-	    syn::ForeignItem::Fn(f) => f,
-	    _ => {
-	        panic!("parsed wrapper prototype did not contain ForeignItem::Fn as expected");
-	    },
-	};
-	
-        // let wrapper_fn_decl = syn::FnDecl{
-        // fn_token: Token![fn],
-        // generics: syn::Generics{},
-        // paren_token: Token![(],
-        // inputs: bare_fn.inputs,
-        // variadic: bare_fn.variadic,
-        // output: bare_fn.output,
-        // };
-
-	let mut wrapper_foreign_item_fn = wrapper_prototype.to_owned();
-	wrapper_foreign_item_fn.ident = api_fn_ident.to_owned();
-//	wrapper_foreign_item_fn.decl.inputs = bare_fn.inputs;
-	wrapper_foreign_item_fn.decl.variadic = bare_fn.variadic;
-	wrapper_foreign_item_fn.decl.output = bare_fn.output;
-	
         let wrapper_tokens = quote! {
-            #wrapper_foreign_item_fn
+            pub fn #api_fn_ident(#api_fn_inputs) #api_fn_output {
+	        println!(stringify!(#api_fn_name " wrapper"));
+		unsafe {
+                    if sqlite3_api.is_null() {
+            	        panic!("sqlite3_api is null");
+        	    }
+        	    ((*sqlite3_api).#field_ident
+            	    .expect(stringify!("sqlite3_api contains null pointer for ", #field_name, " function")))(
+            	        #(#api_fn_input_idents),*
+        	    )
+		}
+	    }
         };
         return wrapper_tokens;
     }
 }
-
-//pub fn sqlite3_declare_vtab unsafe extern "C" fn ( arg1 : * mut sqlite3 , arg2 : * const :: std :: os :: raw :: c_char ) -> :: std :: os :: raw :: c_int { println ! ( "#
-//api_fn_name wrapper" ) ; }
-// pub fn sqlite3_declare_vtab(
-//     arg1: *mut sqlite3,
-//     zSQL: *const ::std::os::raw::c_char,
-// ) -> ::std::os::raw::c_int {
-//     println!("sqlite3_declare_vtab wrapper");
-//     unsafe {
-//         if sqlite3_api.is_null() {
-//             panic!("sqlite3_api is null");
-//         }
-//         ((*sqlite3_api)
-//             .declare_vtab
-//             .expect("sqlite3_api contains null pointer for declare_vtab function"))(
-//             arg1, zSQL
-//         )
-//     }
-// }
-//				let field_type = quote!(#field_ty).to_string();
-//				wrappers.push_str(&format!("loadable_extension_api_wrapper!({}, {}, {})\n", api_fn_name, ident, field_type));
