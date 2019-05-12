@@ -606,36 +606,42 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
         let bare_fn = bare_fn_from_type_path(syn_type);
         let api_fn_output = &bare_fn.output;
 
-        // string to gather up the wrapper for return
-        let mut wrapper = String::new();
-
-        let add_var_args = match bare_fn.variadic {
-            Some(_) => match field_name.as_ref() {
-	    	// hard-code specific number of arguments to put in place of variadic
-	        "db_config" => 2,
-                _ => 1,
-            },
-            _ => 0,
-        };
-
         // prepare inputs
         let mut api_fn_inputs = bare_fn.inputs.clone();
-        for extra_arg_n in 0..add_var_args {
-            let mut input = api_fn_inputs[api_fn_inputs.len() - 1].clone();
-            let input_name = match &input.name {
-                Some((syn::BareFnArgName::Named(ident), _)) => {
-                    format!("{}_va{}", ident.to_string(), extra_arg_n)
-                }
-                _ => {
-                    panic!("Input has no name {:#?}", input);
-                }
-            };
-            let input_ident = syn::Ident::new(&input_name, field_ident.span());
-            let colon = Token![:](field_ident.span());
-            input.name = Some((syn::BareFnArgName::Named(input_ident), colon));
 
-            api_fn_inputs.push(input);
+        // handle variadic api functions
+        if bare_fn.variadic.is_some() {
+            // until rust c_variadic support exists, we can't
+            // transparently wrap variadic api functions.
+            // generate specific set of args in place of
+            // variadic for each function we care about.
+            let var_arg_types: Vec<Option<syn::Type>> = match api_fn_name.as_ref() {
+                "sqlite3_db_config" => {
+                    let mut_int_type: syn::TypeReference = syn::parse2(quote!(&mut i32))
+                        .expect("failed to parse mutable integer reference");
+                    vec![None, Some(syn::Type::Reference(mut_int_type))]
+                }
+                _ => vec![None],
+            };
+
+            for (index, var_arg_type) in var_arg_types.iter().enumerate() {
+                let mut input = api_fn_inputs[api_fn_inputs.len() - 1].clone();
+                let input_ident =
+                    syn::Ident::new(&format!("vararg{}", index + 1), field_ident.span());
+                let colon = Token![:](field_ident.span());
+                input.name = Some((syn::BareFnArgName::Named(input_ident), colon));
+                match var_arg_type.to_owned() {
+                    Some(t) => {
+                        //		    println!("assigning type {:#?} to input {:#?}", t, input);
+                        input.ty = t;
+                    }
+                    None => {}
+                };
+                api_fn_inputs.push(input);
+            }
         }
+
+        // get identifiers for each of the inputs to use in the api call
         let api_fn_input_idents: Vec<syn::Ident> = (&api_fn_inputs)
             .into_iter()
             .map(|input| match &input.name {
@@ -646,10 +652,10 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
             })
             .collect();
 
+        // generate wrapper and return it as a string
         let wrapper_tokens = quote! {
-            pub fn #api_fn_ident(#api_fn_inputs) #api_fn_output {
+            pub unsafe fn #api_fn_ident(#api_fn_inputs) #api_fn_output {
             println!(stringify!(#api_fn_name " wrapper"));
-        unsafe {
                     if sqlite3_api.is_null() {
                         panic!("sqlite3_api is null");
                 }
@@ -658,9 +664,7 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
                         #(#api_fn_input_idents),*
                 )
         }
-        }
         };
-        wrapper.push_str(&format!("{}\n\n", wrapper_tokens.to_string()));
-        return wrapper;
+        return format!("{}\n\n", wrapper_tokens.to_string());
     }
 }
