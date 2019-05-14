@@ -444,8 +444,8 @@ mod bindings {
         // corresponding sqlite3 api routine to be blacklisted in the final
         // bindgen run, and add wrappers for each of the API functions to call
         // the API through the sqlite3_api global
-	// FIXME now that we are blacklisting all functions we should be able to
-	// generate code from a single bindgen run. 
+        // FIXME now that we are blacklisting all functions we should be able to
+        // generate code from a single bindgen run.
         let mut wrappers: String = "".to_owned();
         #[cfg(feature = "loadable_extension")]
         {
@@ -512,17 +512,18 @@ extern {
                 let wrapper = generate_wrapper(ident, field_type, &api_fn_name);
                 wrappers.push_str(&wrapper);
             }
-        }
-        wrappers.push_str("\n");
 
-	// some api functions do not have an implementation in sqlite3_api_routines
-	// (for example: sqlite3_config, sqlite3_initialize, sqlite3_interrupt, ...).
-	// while this isn't a problem for shared libraries (unless we actually try to
-	// call them, it is better to blacklist them all so that the build will fail
-	// if an attempt is made to call an extern function that we know won't exist
-	// and to avoid undefined symbol issues when linking the loadable extension
-	// rust code with other (e.g. non-rust) code
- 	bindings = bindings.blacklist_function(".*");
+            wrappers.push_str("\n");
+
+            // some api functions do not have an implementation in sqlite3_api_routines
+            // (for example: sqlite3_config, sqlite3_initialize, sqlite3_interrupt, ...).
+            // while this isn't a problem for shared libraries (unless we actually try to
+            // call them, it is better to blacklist them all so that the build will fail
+            // if an attempt is made to call an extern function that we know won't exist
+            // and to avoid undefined symbol issues when linking the loadable extension
+            // rust code with other (e.g. non-rust) code
+            bindings = bindings.blacklist_function(".*");
+        }
 
         bindings
             .generate()
