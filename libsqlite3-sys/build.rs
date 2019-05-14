@@ -439,19 +439,52 @@ mod bindings {
         // the global sqlite3_api instance of the sqlite3_api_routines structure
         // do not result in any code production.
         //
-        // Here we do an early bindgen run with a whitelist to get the list of
-        // API functions supported by sqlite3_api_routines, set the
-        // corresponding sqlite3 api routine to be blacklisted in the final
-        // bindgen run, and add wrappers for each of the API functions to call
-        // the API through the sqlite3_api global
-        // FIXME now that we are blacklisting all functions we should be able to
-        // generate code from a single bindgen run.
-        let mut wrappers: String = "".to_owned();
+	// Before defining wrappers to take their place, we need to blacklist
+	// all sqlite3 API functions since none of their symbols will be
+	// available directly when being loaded as an extension.
+        #[cfg(feature = "loadable_extension")]
+        {
+            // some api functions do not have an implementation in sqlite3_api_routines
+            // (for example: sqlite3_config, sqlite3_initialize, sqlite3_interrupt, ...).
+            // while this isn't a problem for shared libraries (unless we actually try to
+            // call them, it is better to blacklist them all so that the build will fail
+            // if an attempt is made to call an extern function that we know won't exist
+            // and to avoid undefined symbol issues when linking the loadable extension
+            // rust code with other (e.g. non-rust) code
+            bindings = bindings.blacklist_function(".*");
+	}
+
+        bindings
+            .generate()
+            .expect(&format!("could not run bindgen on header {}", header))
+            .write(Box::new(&mut output))
+            .expect("could not write output of bindgen");
+        let mut output = String::from_utf8(output).expect("bindgen output was not UTF-8?!");
+
+        // Get the list of API functions supported by sqlite3_api_routines,
+	// set the corresponding sqlite3 api routine to be blacklisted in the
+	// final bindgen run, and add wrappers for each of the API functions to
+	// dispatch the API call through a sqlite3_api global, which is also
+	// declared in the bindings (either as a built-in or an extern symbol
+	// in the case of loadable_extension_embedded (i.e. when the rust code
+	// will be a part of an extension but not implement the extension
+	// entrypoint itself).
         #[cfg(feature = "loadable_extension")]
         {
             let api_routines_struct_name = "sqlite3_api_routines".to_owned();
 
-            wrappers.push_str(
+            let api_routines_struct =
+                match get_struct_by_name(&output, &api_routines_struct_name) {
+                    Some(s) => s,
+                    None => {
+                        panic!(
+                            "Failed to find struct {} in early bindgen output",
+                            api_routines_struct_name
+                        );
+                    }
+                };
+
+            output.push_str(
                 r#"
 
 // a non-embedded loadable extension is a standalone rust loadable extension, 
@@ -473,28 +506,6 @@ extern {
 "#,
             );
 
-            let early_bindgen_output = bindgen::builder()
-                .header(header.clone())
-                .parse_callbacks(Box::new(SqliteTypeChooser))
-                .rustfmt_bindings(false)
-                .layout_tests(false)
-                .whitelist_type(&api_routines_struct_name)
-                .whitelist_recursively(false)
-                .generate()
-                .expect(&format!("could not run bindgen on header {}", header))
-                .to_string();
-
-            let api_routines_struct =
-                match get_struct_by_name(&early_bindgen_output, &api_routines_struct_name) {
-                    Some(s) => s,
-                    None => {
-                        panic!(
-                            "Failed to find struct {} in early bindgen output",
-                            api_routines_struct_name
-                        );
-                    }
-                };
-
             // create wrapper for each field in api routines struct
             for field in &api_routines_struct.fields {
                 let ident = match &field.ident {
@@ -508,34 +519,13 @@ extern {
                 // construct global sqlite api function identifier from field identifier
                 let api_fn_name = format!("sqlite3_{}", ident);
 
-                // generate wrapper function and push it to wrappers string
+                // generate wrapper function and push it to output string
                 let wrapper = generate_wrapper(ident, field_type, &api_fn_name);
-                wrappers.push_str(&wrapper);
+                output.push_str(&wrapper);
             }
 
-            wrappers.push_str("\n");
+            output.push_str("\n");
 
-            // some api functions do not have an implementation in sqlite3_api_routines
-            // (for example: sqlite3_config, sqlite3_initialize, sqlite3_interrupt, ...).
-            // while this isn't a problem for shared libraries (unless we actually try to
-            // call them, it is better to blacklist them all so that the build will fail
-            // if an attempt is made to call an extern function that we know won't exist
-            // and to avoid undefined symbol issues when linking the loadable extension
-            // rust code with other (e.g. non-rust) code
-            bindings = bindings.blacklist_function(".*");
-        }
-
-        bindings
-            .generate()
-            .expect(&format!("could not run bindgen on header {}", header))
-            .write(Box::new(&mut output))
-            .expect("could not write output of bindgen");
-        let mut output = String::from_utf8(output).expect("bindgen output was not UTF-8?!");
-
-        // For loadable extension support, we need to append the wrappers generated above
-        #[cfg(feature = "loadable_extension")]
-        {
-            output.push_str(&wrappers);
         }
 
         // rusqlite's functions feature ors in the SQLITE_DETERMINISTIC flag when it
