@@ -51,9 +51,6 @@ pub enum Limit {
 
 include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
 
-//#[cfg(feature = "loadable_extension")]
-//include!("loadable-extension-api-wrappers.rs");
-
 pub type sqlite3_index_constraint = sqlite3_index_info_sqlite3_index_constraint;
 pub type sqlite3_index_constraint_usage = sqlite3_index_info_sqlite3_index_constraint_usage;
 

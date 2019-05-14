@@ -444,19 +444,33 @@ mod bindings {
         // corresponding sqlite3 api routine to be blacklisted in the final
         // bindgen run, and add wrappers for each of the API functions to call
         // the API through the sqlite3_api global
+	// FIXME now that we are blacklisting all functions we should be able to
+	// generate code from a single bindgen run. 
         let mut wrappers: String = "".to_owned();
         #[cfg(feature = "loadable_extension")]
         {
             let api_routines_struct_name = "sqlite3_api_routines".to_owned();
 
             wrappers.push_str(
-                "
+                r#"
 
+// a non-embedded loadable extension is a standalone rust loadable extension, 
+// so we need our own sqlite3_api global
+#[cfg(not(feature = "loadable_extension_embedded"))]
 #[no_mangle]
 pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
 
+// an embedded loadable extension is one in which the rust code will be linked in to 
+// external code that implements the loadable extension and exports the sqlite3_api 
+// interface as a symbol
+#[cfg(feature = "loadable_extension_embedded")]
+extern {
+    #[no_mangle]
+    pub static mut sqlite3_api: *mut sqlite3_api_routines;
+}
+
 // Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)
-",
+"#,
             );
 
             let early_bindgen_output = bindgen::builder()
@@ -494,15 +508,21 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
                 // construct global sqlite api function identifier from field identifier
                 let api_fn_name = format!("sqlite3_{}", ident);
 
-                // add global sqlite api function name to blacklist for next bindgen run
-                bindings = bindings.blacklist_function(&api_fn_name);
-
                 // generate wrapper function and push it to wrappers string
                 let wrapper = generate_wrapper(ident, field_type, &api_fn_name);
                 wrappers.push_str(&wrapper);
             }
         }
         wrappers.push_str("\n");
+
+	// some api functions do not have an implementation in sqlite3_api_routines
+	// (for example: sqlite3_config, sqlite3_initialize, sqlite3_interrupt, ...).
+	// while this isn't a problem for shared libraries (unless we actually try to
+	// call them, it is better to blacklist them all so that the build will fail
+	// if an attempt is made to call an extern function that we know won't exist
+	// and to avoid undefined symbol issues when linking the loadable extension
+	// rust code with other (e.g. non-rust) code
+ 	bindings = bindings.blacklist_function(".*");
 
         bindings
             .generate()
