@@ -25,6 +25,7 @@ function generate_bindgen_bindings() {
     manifest="${SCRIPT_DIR}/../Cargo.toml"
     generate_bindgen_binding "${manifest}" "${build_dir}" "${SCRIPT_DIR}" "buildtime_bindgen" "${version}"
     generate_bindgen_binding "${manifest}" "${build_dir}" "${SCRIPT_DIR}" "buildtime_bindgen,loadable_extension" "${version}-ext"
+    generate_bindgen_binding "${manifest}" "${build_dir}" "${SCRIPT_DIR}" "buildtime_bindgen,loadable_extension_embedded" "${version}-ext-embed"
     >&2 echo "done generating bindings for sqlite ${version}"
 }
 

@@ -388,7 +388,9 @@ mod bindings {
     }
 
     fn prebuilt_bindgen_ext() -> &'static str {
-        if cfg!(feature = "loadable_extension") {
+        if cfg!(feature = "loadable_extension_embedded") {
+            "-ext-embed"
+        } else if cfg!(feature = "loadable_extension") {
             "-ext"
         } else {
             ""
@@ -491,27 +493,44 @@ mod bindings {
                 }
             };
 
-            output.push_str(
-                r#"
+            #[cfg(feature = "loadable_extension_embedded")]
+            {
+                // an embedded loadable extension is one in which the rust code will be linked in to
+                // external code that implements the loadable extension and exports the sqlite3_api
+                // interface as a symbol
+                output.push_str(
+                    r#"
 
-// a non-embedded loadable extension is a standalone rust loadable extension, 
-// so we need our own sqlite3_api global
-#[cfg(not(feature = "loadable_extension_embedded"))]
-#[no_mangle]
-pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
-
-// an embedded loadable extension is one in which the rust code will be linked in to 
-// external code that implements the loadable extension and exports the sqlite3_api 
-// interface as a symbol
-#[cfg(feature = "loadable_extension_embedded")]
+// bindings were built with loadable_extension_embedded:
+// define sqlite3_api as an extern since this code will be embedded 
+// within a loadable extension that defines and exports this itself
 extern {
     #[no_mangle]
     pub static mut sqlite3_api: *mut sqlite3_api_routines;
 }
 
-// Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)
 "#,
-            );
+                );
+            }
+
+            #[cfg(not(feature = "loadable_extension_embedded"))]
+            {
+                // a non-embedded loadable extension is a standalone rust loadable extension,
+                // so we need our own sqlite3_api global
+                output.push_str(
+                    r#"
+
+// bindings were built with (non-embedded) loadable_extension:
+// we define our own sqlite_api static variable and export it 
+// to C
+#[no_mangle]
+pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
+
+"#,
+                );
+            }
+
+            output.push_str("// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)");
 
             // create wrapper for each field in api routines struct
             for field in &api_routines_struct.fields {
