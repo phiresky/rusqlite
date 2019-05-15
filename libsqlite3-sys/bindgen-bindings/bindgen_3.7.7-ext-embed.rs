@@ -5340,11 +5340,13 @@ fn bindgen_test_layout___va_list_tag() {
     );
 }
 
-// bindings were built with (non-embedded) loadable_extension:
-// we define our own sqlite_api static variable and export it
-// to C
-#[no_mangle]
-pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
+// bindings were built with loadable_extension_embedded:
+// define sqlite3_api as an extern since this code will be embedded
+// within a loadable extension that defines and exports this itself
+extern "C" {
+    #[no_mangle]
+    pub static mut sqlite3_api: *mut sqlite3_api_routines;
+}
 
 // sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)pub unsafe fn sqlite3_aggregate_context ( arg1 : * mut sqlite3_context , nBytes : :: std :: os :: raw :: c_int ) -> * mut :: std :: os :: raw :: c_void { if sqlite3_api . is_null ( ) { panic ! ( "sqlite3_api is null" ) ; } ( ( * sqlite3_api ) . aggregate_context . expect ( stringify ! ( "sqlite3_api contains null pointer for " , "aggregate_context" , " function" ) ) ) ( arg1 , nBytes ) }
 

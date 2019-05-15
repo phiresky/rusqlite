@@ -4653,35 +4653,13 @@ fn bindgen_test_layout___va_list_tag() {
     );
 }
 
-// a non-embedded loadable extension is a standalone rust loadable extension,
-// so we need our own sqlite3_api global
-#[cfg(not(feature = "loadable_extension_embedded"))]
+// bindings were built with (non-embedded) loadable_extension:
+// we define our own sqlite_api static variable and export it
+// to C
 #[no_mangle]
 pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
 
-// an embedded loadable extension is one in which the rust code will be linked in to
-// external code that implements the loadable extension and exports the sqlite3_api
-// interface as a symbol
-#[cfg(feature = "loadable_extension_embedded")]
-extern "C" {
-    #[no_mangle]
-    pub static mut sqlite3_api: *mut sqlite3_api_routines;
-}
-
-// Wrappers to support loadable extensions (generated from build.rs - not by rust-bindgen)
-pub unsafe fn sqlite3_aggregate_context(
-    arg1: *mut sqlite3_context,
-    nBytes: ::std::os::raw::c_int,
-) -> *mut ::std::os::raw::c_void {
-    if sqlite3_api.is_null() {
-        panic!("sqlite3_api is null");
-    }
-    ((*sqlite3_api).aggregate_context.expect(stringify!(
-        "sqlite3_api contains null pointer for ",
-        "aggregate_context",
-        " function"
-    )))(arg1, nBytes)
-}
+// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)pub unsafe fn sqlite3_aggregate_context ( arg1 : * mut sqlite3_context , nBytes : :: std :: os :: raw :: c_int ) -> * mut :: std :: os :: raw :: c_void { if sqlite3_api . is_null ( ) { panic ! ( "sqlite3_api is null" ) ; } ( ( * sqlite3_api ) . aggregate_context . expect ( stringify ! ( "sqlite3_api contains null pointer for " , "aggregate_context" , " function" ) ) ) ( arg1 , nBytes ) }
 
 pub unsafe fn sqlite3_aggregate_count(arg1: *mut sqlite3_context) -> ::std::os::raw::c_int {
     if sqlite3_api.is_null() {
