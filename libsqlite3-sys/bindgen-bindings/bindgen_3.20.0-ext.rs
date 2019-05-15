@@ -7387,7 +7387,21 @@ fn bindgen_test_layout___va_list_tag() {
 #[no_mangle]
 pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
 
-// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)pub unsafe fn sqlite3_aggregate_context ( arg1 : * mut sqlite3_context , nBytes : :: std :: os :: raw :: c_int ) -> * mut :: std :: os :: raw :: c_void { if sqlite3_api . is_null ( ) { panic ! ( "sqlite3_api is null" ) ; } ( ( * sqlite3_api ) . aggregate_context . expect ( stringify ! ( "sqlite3_api contains null pointer for " , "aggregate_context" , " function" ) ) ) ( arg1 , nBytes ) }
+// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)
+
+pub unsafe fn sqlite3_aggregate_context(
+    arg1: *mut sqlite3_context,
+    nBytes: ::std::os::raw::c_int,
+) -> *mut ::std::os::raw::c_void {
+    if sqlite3_api.is_null() {
+        panic!("sqlite3_api is null");
+    }
+    ((*sqlite3_api).aggregate_context.expect(stringify!(
+        "sqlite3_api contains null pointer for ",
+        "aggregate_context",
+        " function"
+    )))(arg1, nBytes)
+}
 
 pub unsafe fn sqlite3_aggregate_count(arg1: *mut sqlite3_context) -> ::std::os::raw::c_int {
     if sqlite3_api.is_null() {
