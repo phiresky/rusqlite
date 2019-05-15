@@ -405,8 +405,10 @@ mod bindings {
     use super::HeaderLocation;
 
     use std::fs::OpenOptions;
+    use std::io::copy;
     use std::io::Write;
     use std::path::Path;
+    use std::process::{Command, Stdio};
 
     #[derive(Debug)]
     struct SqliteTypeChooser;
@@ -427,7 +429,7 @@ mod bindings {
         let mut bindings = bindgen::builder()
             .header(header.clone())
             .parse_callbacks(Box::new(SqliteTypeChooser))
-            .rustfmt_bindings(true);
+            .rustfmt_bindings(false); // we'll run rustfmt after (possibly) adding wrappers
 
         if cfg!(feature = "unlock_notify") {
             bindings = bindings.clang_arg("-DSQLITE_ENABLE_UNLOCK_NOTIFY");
@@ -445,9 +447,9 @@ mod bindings {
         // the global sqlite3_api instance of the sqlite3_api_routines structure
         // do not result in any code production.
         //
-	// Before defining wrappers to take their place, we need to blacklist
-	// all sqlite3 API functions since none of their symbols will be
-	// available directly when being loaded as an extension.
+        // Before defining wrappers to take their place, we need to blacklist
+        // all sqlite3 API functions since none of their symbols will be
+        // available directly when being loaded as an extension.
         #[cfg(feature = "loadable_extension")]
         {
             // some api functions do not have an implementation in sqlite3_api_routines
@@ -458,7 +460,7 @@ mod bindings {
             // and to avoid undefined symbol issues when linking the loadable extension
             // rust code with other (e.g. non-rust) code
             bindings = bindings.blacklist_function(".*");
-	}
+        }
 
         bindings
             .generate()
@@ -468,27 +470,26 @@ mod bindings {
         let mut output = String::from_utf8(output).expect("bindgen output was not UTF-8?!");
 
         // Get the list of API functions supported by sqlite3_api_routines,
-	// set the corresponding sqlite3 api routine to be blacklisted in the
-	// final bindgen run, and add wrappers for each of the API functions to
-	// dispatch the API call through a sqlite3_api global, which is also
-	// declared in the bindings (either as a built-in or an extern symbol
-	// in the case of loadable_extension_embedded (i.e. when the rust code
-	// will be a part of an extension but not implement the extension
-	// entrypoint itself).
+        // set the corresponding sqlite3 api routine to be blacklisted in the
+        // final bindgen run, and add wrappers for each of the API functions to
+        // dispatch the API call through a sqlite3_api global, which is also
+        // declared in the bindings (either as a built-in or an extern symbol
+        // in the case of loadable_extension_embedded (i.e. when the rust code
+        // will be a part of an extension but not implement the extension
+        // entrypoint itself).
         #[cfg(feature = "loadable_extension")]
         {
             let api_routines_struct_name = "sqlite3_api_routines".to_owned();
 
-            let api_routines_struct =
-                match get_struct_by_name(&output, &api_routines_struct_name) {
-                    Some(s) => s,
-                    None => {
-                        panic!(
-                            "Failed to find struct {} in early bindgen output",
-                            api_routines_struct_name
-                        );
-                    }
-                };
+            let api_routines_struct = match get_struct_by_name(&output, &api_routines_struct_name) {
+                Some(s) => s,
+                None => {
+                    panic!(
+                        "Failed to find struct {} in early bindgen output",
+                        api_routines_struct_name
+                    );
+                }
+            };
 
             output.push_str(
                 r#"
@@ -531,7 +532,6 @@ extern {
             }
 
             output.push_str("\n");
-
         }
 
         // rusqlite's functions feature ors in the SQLITE_DETERMINISTIC flag when it
@@ -551,8 +551,45 @@ extern {
             .open(out_path.clone())
             .expect(&format!("Could not write to {:?}", out_path));
 
-        file.write_all(output.as_bytes())
+        // pipe generated bindings through rustfmt
+        let rustfmt = which::which("rustfmt")
+            .expect("rustfmt not on PATH")
+            .to_owned();
+        let mut cmd = Command::new(rustfmt);
+        cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
+        let mut rustfmt_child = cmd.spawn().expect("failed to execute rustfmt");
+        let mut rustfmt_child_stdin = rustfmt_child.stdin.take().unwrap();
+        let mut rustfmt_child_stdout = rustfmt_child.stdout.take().unwrap();
+
+        // spawn a thread to write output string to rustfmt stdin
+        let stdin_handle = ::std::thread::spawn(move || {
+            let _ = rustfmt_child_stdin.write_all(output.as_bytes());
+            output
+        });
+
+        // read stdout of rustfmt and write it to bindings file at out_path
+        copy(&mut rustfmt_child_stdout, &mut file)
             .expect(&format!("Could not write to {:?}", out_path));
+
+        let status = rustfmt_child
+            .wait()
+            .expect("failed to wait for rustfmt to complete");
+        stdin_handle
+            .join()
+            .expect("The impossible: writer to rustfmt stdin cannot panic");
+
+        match status.code() {
+            Some(0) => {}
+            Some(2) => {
+                panic!("rustfmt parsing error");
+            }
+            Some(3) => {
+                panic!("rustfmt could not format some lines.");
+            }
+            _ => {
+                panic!("Internal rustfmt error");
+            }
+        }
     }
 
     #[cfg(feature = "loadable_extension")]
