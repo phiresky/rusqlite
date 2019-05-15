@@ -530,7 +530,11 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
                 );
             }
 
-            output.push_str("// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)");
+            output.push_str(
+		r"
+// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)
+
+");
 
             // create wrapper for each field in api routines struct
             for field in &api_routines_struct.fields {
