@@ -3506,5 +3506,4 @@ fn bindgen_test_layout___va_list_tag() {
         )
     );
 }
-
 pub const SQLITE_DETERMINISTIC: i32 = 2048;
