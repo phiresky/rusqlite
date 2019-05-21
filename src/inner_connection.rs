@@ -332,15 +332,17 @@ pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 // threading mode checks are not possible when built as a loadable extension
 // since the sqlite3_threadsafe, sqlite3_config, and sqlite3_initialize
 // API calls are not available via the sqlite3_api_routines struct.
-#[cfg(any(feature = "loadable_extension", feature = "loadable_extension_embedded"))]
+// They are also not available when sqlite is built without threadsafe (e.g. -DSQLITE_THREADSAFE=0)
+// which is represented here by the "non_threadsafe" feature. 
+#[cfg(any(feature = "loadable_extension", feature = "loadable_extension_embedded", feature= "non_threadsafe"))]
 fn ensure_safe_sqlite_threading_mode() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(feature = "loadable_extension", feature = "loadable_extension_embedded")))]
+#[cfg(not(any(feature = "loadable_extension", feature = "loadable_extension_embedded", feature= "non_threadsafe")))]
 static SQLITE_INIT: Once = ONCE_INIT;
 
-#[cfg(not(any(feature = "loadable_extension", feature = "loadable_extension_embedded")))]
+#[cfg(not(any(feature = "loadable_extension", feature = "loadable_extension_embedded", feature= "non_threadsafe")))]
 fn ensure_safe_sqlite_threading_mode() -> Result<()> {
     // Ensure SQLite was compiled in thredsafe mode.
     if unsafe { ffi::sqlite3_threadsafe() == 0 } {
