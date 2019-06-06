@@ -365,7 +365,7 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Connection> {
         let flags = OpenFlags::default();
-        Connection::open_with_flags(path, flags)
+        Connection::open_with_flags(path, flags, None)
     }
 
     /// Open a new connection to an in-memory SQLite database.
@@ -404,7 +404,7 @@ impl Connection {
     /// # Failure
     ///
     /// Will return `Err` if either `path` or `vfs` cannot be converted to a C-compatible
-    /// string or if the underlying SQLite open call fails.
+    /// string or if the underlying SQLite open call fails. 
     pub fn open_with_flags_and_vfs<P: AsRef<Path>>(path: P, flags: OpenFlags, vfs: &str) -> Result<Connection> {
         let c_path = path_to_cstring(path.as_ref())?;
         let c_vfs = str_to_cstring(vfs)?;
@@ -425,7 +425,26 @@ impl Connection {
     /// Will return `Err` if the underlying SQLite open call fails.
     pub fn open_in_memory_with_flags(flags: OpenFlags) -> Result<Connection> {
         let c_memory = str_to_cstring(":memory:")?;
-        InnerConnection::open_with_flags(&c_memory, flags).map(|db| Connection {
+        InnerConnection::open_with_flags(&c_memory, flags, None).map(|db| Connection {
+            db: RefCell::new(db),
+            cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
+            path: None,
+        })
+    }
+
+    /// Open a new connection to an in-memory SQLite database using the specific flags and vfs name.
+    ///
+    /// [Database Connection](http://www.sqlite.org/c3ref/open.html) for a description of valid
+    /// flag combinations.
+    ///
+    /// # Failure
+    ///
+    /// Will return `Err` if vfs` cannot be converted to a C-compatible
+    /// string or if the underlying SQLite open call fails.
+    pub fn open_in_memory_with_flags(flags: OpenFlags, vfs: &str) -> Result<Connection> {
+        let c_memory = str_to_cstring(":memory:")?;
+        let c_vfs = str_to_cstring(vfs)?;
+        InnerConnection::open_with_flags(&c_memory, flags, Some(c_vfs)).map(|db| Connection {
             db: RefCell::new(db),
             cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
             path: None,
