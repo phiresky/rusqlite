@@ -366,7 +366,26 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub fn open_with_flags<P: AsRef<Path>>(path: P, flags: OpenFlags) -> Result<Connection> {
         let c_path = path_to_cstring(path.as_ref())?;
-        InnerConnection::open_with_flags(&c_path, flags).map(|db| Connection {
+        InnerConnection::open_with_flags(&c_path, flags, None).map(|db| Connection {
+            db: RefCell::new(db),
+            cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
+            path: Some(path.as_ref().to_path_buf()),
+        })
+    }
+
+    /// Open a new connection to a SQLite database using the specific flags and vfs name.
+    ///
+    /// [Database Connection](http://www.sqlite.org/c3ref/open.html) for a description of valid
+    /// flag combinations.
+    ///
+    /// # Failure
+    ///
+    /// Will return `Err` if either `path` or `vfs` cannot be converted to a C-compatible
+    /// string or if the underlying SQLite open call fails.
+    pub fn open_with_flags_and_vfs<P: AsRef<Path>>(path: P, flags: OpenFlags, vfs: &str) -> Result<Connection> {
+        let c_path = path_to_cstring(path.as_ref())?;
+        let c_vfs = str_to_cstring(vfs)?;
+        InnerConnection::open_with_flags(&c_path, flags, Some(c_vfs)).map(|db| Connection {
             db: RefCell::new(db),
             cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
             path: Some(path.as_ref().to_path_buf()),
