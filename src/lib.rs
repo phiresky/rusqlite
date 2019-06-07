@@ -441,7 +441,7 @@ impl Connection {
     ///
     /// Will return `Err` if vfs` cannot be converted to a C-compatible
     /// string or if the underlying SQLite open call fails.
-    pub fn open_in_memory_with_flags(flags: OpenFlags, vfs: &str) -> Result<Connection> {
+    pub fn open_in_memory_with_flags_and_vfs(flags: OpenFlags, vfs: &str) -> Result<Connection> {
         let c_memory = str_to_cstring(":memory:")?;
         let c_vfs = str_to_cstring(vfs)?;
         InnerConnection::open_with_flags(&c_memory, flags, Some(c_vfs)).map(|db| Connection {
