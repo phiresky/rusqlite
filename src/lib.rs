@@ -366,7 +366,7 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Connection> {
         let flags = OpenFlags::default();
-        Connection::open_with_flags(path, flags, None)
+        Connection::open_with_flags(path, flags)
     }
 
     /// Open a new connection to an in-memory SQLite database.
@@ -409,7 +409,7 @@ impl Connection {
     pub fn open_with_flags_and_vfs<P: AsRef<Path>>(path: P, flags: OpenFlags, vfs: &str) -> Result<Connection> {
         let c_path = path_to_cstring(path.as_ref())?;
         let c_vfs = str_to_cstring(vfs)?;
-        InnerConnection::open_with_flags(&c_path, flags, Some(c_vfs)).map(|db| Connection {
+        InnerConnection::open_with_flags(&c_path, flags, Some(&c_vfs)).map(|db| Connection {
             db: RefCell::new(db),
             cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
             path: Some(path.as_ref().to_path_buf()),
@@ -445,7 +445,7 @@ impl Connection {
     pub fn open_in_memory_with_flags_and_vfs(flags: OpenFlags, vfs: &str) -> Result<Connection> {
         let c_memory = str_to_cstring(":memory:")?;
         let c_vfs = str_to_cstring(vfs)?;
-        InnerConnection::open_with_flags(&c_memory, flags, Some(c_vfs)).map(|db| Connection {
+        InnerConnection::open_with_flags(&c_memory, flags, Some(&c_vfs)).map(|db| Connection {
             db: RefCell::new(db),
             cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
             path: None,
