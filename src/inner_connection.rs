@@ -99,7 +99,7 @@ impl InnerConnection {
             ));
         }
 
-        let z_vfs = match(vfs) {
+        let z_vfs = match vfs {
             Some(c_vfs) => c_vfs.as_ptr(),
             None => ptr::null()
         };
