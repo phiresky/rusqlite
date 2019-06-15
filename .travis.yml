@@ -2,6 +2,10 @@ sudo: false
 
 language: rust
 
+cache: cargo
+
+before_script: (cargo install rustfmt || true)
+
 rust:
   - stable
   - beta
