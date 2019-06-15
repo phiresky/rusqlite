@@ -1,3 +1,26 @@
+//*****************************************************************************
+// Copyright (c) 2014 John Gallagher <johnkgallagher@gmail.com>
+// Copyright (c) 2019 Genomics plc <info@genomicsplc.com>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE
+//*****************************************************************************
+
 //! Rusqlite is an ergonomic wrapper for using SQLite from Rust. It attempts to
 //! expose an interface similar to [rust-postgres](https://github.com/sfackler/rust-postgres).
 //!
@@ -342,7 +365,7 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Connection> {
         let flags = OpenFlags::default();
-        Connection::open_with_flags(path, flags)
+        Connection::open_with_flags(path, flags, None)
     }
 
     /// Open a new connection to an in-memory SQLite database.
@@ -366,7 +389,26 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub fn open_with_flags<P: AsRef<Path>>(path: P, flags: OpenFlags) -> Result<Connection> {
         let c_path = path_to_cstring(path.as_ref())?;
-        InnerConnection::open_with_flags(&c_path, flags).map(|db| Connection {
+        InnerConnection::open_with_flags(&c_path, flags, None).map(|db| Connection {
+            db: RefCell::new(db),
+            cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
+            path: Some(path.as_ref().to_path_buf()),
+        })
+    }
+
+    /// Open a new connection to a SQLite database using the specific flags and vfs name.
+    ///
+    /// [Database Connection](http://www.sqlite.org/c3ref/open.html) for a description of valid
+    /// flag combinations.
+    ///
+    /// # Failure
+    ///
+    /// Will return `Err` if either `path` or `vfs` cannot be converted to a C-compatible
+    /// string or if the underlying SQLite open call fails. 
+    pub fn open_with_flags_and_vfs<P: AsRef<Path>>(path: P, flags: OpenFlags, vfs: &str) -> Result<Connection> {
+        let c_path = path_to_cstring(path.as_ref())?;
+        let c_vfs = str_to_cstring(vfs)?;
+        InnerConnection::open_with_flags(&c_path, flags, Some(&c_vfs)).map(|db| Connection {
             db: RefCell::new(db),
             cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
             path: Some(path.as_ref().to_path_buf()),
@@ -383,7 +425,26 @@ impl Connection {
     /// Will return `Err` if the underlying SQLite open call fails.
     pub fn open_in_memory_with_flags(flags: OpenFlags) -> Result<Connection> {
         let c_memory = str_to_cstring(":memory:")?;
-        InnerConnection::open_with_flags(&c_memory, flags).map(|db| Connection {
+        InnerConnection::open_with_flags(&c_memory, flags, None).map(|db| Connection {
+            db: RefCell::new(db),
+            cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
+            path: None,
+        })
+    }
+
+    /// Open a new connection to an in-memory SQLite database using the specific flags and vfs name.
+    ///
+    /// [Database Connection](http://www.sqlite.org/c3ref/open.html) for a description of valid
+    /// flag combinations.
+    ///
+    /// # Failure
+    ///
+    /// Will return `Err` if vfs` cannot be converted to a C-compatible
+    /// string or if the underlying SQLite open call fails.
+    pub fn open_in_memory_with_flags_and_vfs(flags: OpenFlags, vfs: &str) -> Result<Connection> {
+        let c_memory = str_to_cstring(":memory:")?;
+        let c_vfs = str_to_cstring(vfs)?;
+        InnerConnection::open_with_flags(&c_memory, flags, Some(&c_vfs)).map(|db| Connection {
             db: RefCell::new(db),
             cache: StatementCache::with_capacity(STATEMENT_CACHE_DEFAULT_CAPACITY),
             path: None,
