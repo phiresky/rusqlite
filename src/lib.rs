@@ -366,7 +366,7 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Connection> {
         let flags = OpenFlags::default();
-        Connection::open_with_flags(path, flags, None)
+        Connection::open_with_flags(path, flags)
     }
 
     /// Open a new connection to an in-memory SQLite database.
