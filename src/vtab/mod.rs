@@ -432,6 +432,11 @@ pub trait VTabCursor: Sized {
     /// Return the rowid of row that the cursor is currently pointing at.
     /// (See [SQLite doc](https://sqlite.org/vtab.html#the_xrowid_method))
     fn rowid(&self) -> Result<i64>;
+    /// Allow the cursor to clean up after itself
+    /// (See [SQLite doc](https://sqlite.org/vtab.html#the_xclose_method)
+    fn close(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Context is used by `VTabCursor.column` to specify the cell value.
@@ -837,6 +842,8 @@ where
     C: VTabCursor,
 {
     let cr = cursor as *mut C;
+    // FIXME: Not sure on how to handle error
+    cursor_error(cursor, (*cr).close());
     let _: Box<C> = Box::from_raw(cr);
     ffi::SQLITE_OK
 }
