@@ -103,7 +103,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::cache::StatementCache;
 use crate::inner_connection::{InnerConnection, BYPASS_SQLITE_INIT};
-use crate::raw_statement::RawStatement;
+pub use crate::raw_statement::RawStatement;
 use crate::types::ValueRef;
 
 pub use crate::cache::CachedStatement;
@@ -405,8 +405,12 @@ impl Connection {
     /// # Failure
     ///
     /// Will return `Err` if either `path` or `vfs` cannot be converted to a C-compatible
-    /// string or if the underlying SQLite open call fails. 
-    pub fn open_with_flags_and_vfs<P: AsRef<Path>>(path: P, flags: OpenFlags, vfs: &str) -> Result<Connection> {
+    /// string or if the underlying SQLite open call fails.
+    pub fn open_with_flags_and_vfs<P: AsRef<Path>>(
+        path: P,
+        flags: OpenFlags,
+        vfs: &str,
+    ) -> Result<Connection> {
         let c_path = path_to_cstring(path.as_ref())?;
         let c_vfs = str_to_cstring(vfs)?;
         InnerConnection::open_with_flags(&c_path, flags, Some(&c_vfs)).map(|db| Connection {
@@ -886,8 +890,13 @@ impl InterruptHandle {
     pub fn interrupt(&self) {
         let db_handle = self.db_lock.lock().unwrap();
         if !db_handle.is_null() {
-	    #[cfg(not(any(feature = "loadable_extension", feature = "loadable_extension_embedded")))] // no sqlite3_interrupt in a loadable extension
-            unsafe { ffi::sqlite3_interrupt(*db_handle) }
+            #[cfg(not(any(
+                feature = "loadable_extension",
+                feature = "loadable_extension_embedded"
+            )))] // no sqlite3_interrupt in a loadable extension
+            unsafe {
+                ffi::sqlite3_interrupt(*db_handle)
+            }
         }
     }
 }
