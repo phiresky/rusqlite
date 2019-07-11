@@ -250,6 +250,7 @@ bitflags! {
 /// method.
 ///
 /// (See [SQLite doc](http://sqlite.org/c3ref/index_info.html))
+#[derive(Debug)]
 pub struct IndexInfo(*mut ffi::sqlite3_index_info);
 
 impl IndexInfo {
@@ -287,6 +288,23 @@ impl IndexInfo {
     pub fn set_idx_num(&mut self, idx_num: c_int) {
         unsafe {
             (*self.0).idxNum = idx_num;
+        }
+    }
+
+    /// String passed if/when filter() is called on the cursor
+    pub fn set_idx_str(&mut self, idx_str: &str) {
+        unsafe {
+            println!("Setting string: {:?}", idx_str);
+
+            let c_idx_str = CString::new(idx_str).
+                expect("Couldn't create C string (probably because idx_str contains a 0 character)").
+                into_bytes_with_nul();
+
+            let dst = ffi::sqlite3_malloc(c_idx_str.len() as i32) as *mut ::std::os::raw::c_char;
+            (*self.0).idxStr = dst;
+            (*self.0).needToFreeIdxStr = true as i32;
+
+            ptr::copy(c_idx_str.as_ptr() as *const i8, dst, c_idx_str.len());
         }
     }
 
