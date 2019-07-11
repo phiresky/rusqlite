@@ -333,6 +333,11 @@ impl IndexInfo {
     // TODO idxFlags
     // TODO colUsed
 
+    /// Information about the columns required for the query
+    pub fn col_used(&self) -> u64 {
+        unsafe { (*self.0).colUsed as u64 }
+    }
+    
     // TODO sqlite3_vtab_collation (http://sqlite.org/c3ref/vtab_collation.html)
 }
 
