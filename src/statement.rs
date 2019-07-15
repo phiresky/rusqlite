@@ -401,7 +401,7 @@ impl Statement<'_> {
         Ok(self.stmt.bind_parameter_index(&c_name))
     }
 
-    fn bind_parameters<P>(&mut self, params: P) -> Result<()>
+    pub fn bind_parameters<P>(&mut self, params: P) -> Result<()>
     where
         P: IntoIterator,
         P::Item: ToSql,
@@ -526,7 +526,7 @@ impl Statement<'_> {
 
     /// Returns a string containing the SQL text of prepared statement with
     /// bound parameters expanded.
-    #[cfg(feature = "bundled")]
+    //#[cfg(feature = "bundled")]
     pub fn expanded_sql(&self) -> Option<&str> {
         unsafe {
             self.stmt

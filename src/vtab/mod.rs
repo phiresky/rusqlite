@@ -294,8 +294,6 @@ impl IndexInfo {
     /// String passed if/when filter() is called on the cursor
     pub fn set_idx_str(&mut self, idx_str: &str) {
         unsafe {
-            println!("Setting string: {:?}", idx_str);
-
             let c_idx_str = CString::new(idx_str).
                 expect("Couldn't create C string (probably because idx_str contains a 0 character)").
                 into_bytes_with_nul();
