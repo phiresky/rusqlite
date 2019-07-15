@@ -526,7 +526,7 @@ impl Statement<'_> {
 
     /// Returns a string containing the SQL text of prepared statement with
     /// bound parameters expanded.
-    //#[cfg(feature = "bundled")]
+    #[cfg(feature = "bundled")]
     pub fn expanded_sql(&self) -> Option<&str> {
         unsafe {
             self.stmt
