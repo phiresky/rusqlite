@@ -368,6 +368,12 @@ mod bindings {
         "bindgen-bindings/bindgen_3.7.7",
         #[cfg(feature = "min_sqlite_version_3_7_16")]
         "bindgen-bindings/bindgen_3.7.16",
+        #[cfg(feature = "min_sqlite_version_3_8_2")]
+        "bindgen-bindings/bindgen_3.13.0", // require 3.8.2+, but just use 3.13.0
+        #[cfg(feature = "min_sqlite_version_3_9_0")]
+        "bindgen-bindings/bindgen_3.13.0", // require 3.9.0+, but just use 3.13.0
+        #[cfg(feature = "min_sqlite_version_3_10_0")]
+        "bindgen-bindings/bindgen_3.13.0", // require 3.10.0+, but just use 3.13.0
         #[cfg(feature = "min_sqlite_version_3_13_0")]
         "bindgen-bindings/bindgen_3.13.0",
         #[cfg(feature = "min_sqlite_version_3_20_0")]

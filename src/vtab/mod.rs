@@ -321,7 +321,7 @@ impl IndexInfo {
     }
 
     /// Estimated number of rows returned
-    #[cfg(feature = "bundled")] // SQLite >= 3.8.2
+    #[cfg(feature = "vtab_estimated_rows")] // SQLite >= 3.8.2
     pub fn set_estimated_rows(&mut self, estimated_rows: i64) {
         unsafe {
             (*self.0).estimatedRows = estimated_rows;
@@ -331,7 +331,7 @@ impl IndexInfo {
     // TODO idxFlags
 
     /// Information about the columns required for the query
-    //#[cfg(feature = "bundled")] // SQLite >= 3.10.0
+    #[cfg(feature = "vtab_col_used")] // SQLite >= 3.10.0
     pub fn col_used(&self) -> u64 {
         unsafe { (*self.0).colUsed as u64 }
     }
