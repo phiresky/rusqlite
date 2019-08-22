@@ -336,7 +336,17 @@ impl IndexInfo {
         unsafe { (*self.0).colUsed as u64 }
     }
 
-    // TODO sqlite3_vtab_collation (http://sqlite.org/c3ref/vtab_collation.html)
+    #[cfg(feature = "vtab_collation")] // SQLite >= 3.22.0
+    pub fn collation(&self, constraint_idx: usize) -> Result<&str> {
+        use std::ffi::CStr;
+        let constraint_idx_c = constraint_idx as c_int;
+        let collation_c_buf = unsafe { ffi::sqlite3_vtab_collation(self.0, constraint_idx_c) };
+        let collation_c_str = unsafe { CStr::from_ptr(collation_c_buf) };
+        match collation_c_str.to_str() {
+            Ok(collation) => Ok(collation),
+            Err(err) => Err(Error::Utf8Error(err)),
+        }
+    }
 }
 
 pub struct IndexConstraintIter<'a> {
