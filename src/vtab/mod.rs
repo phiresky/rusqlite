@@ -681,7 +681,7 @@ where
 {
     use std::error::Error as StdError;
     use std::ffi::CStr;
-    use std::slice;
+//    use std::slice;
 
     let mut conn = VTabConnection(db);
     let aux = aux as *mut T::Aux;
@@ -735,7 +735,7 @@ where
 {
     use std::error::Error as StdError;
     use std::ffi::CStr;
-    use std::slice;
+//    use std::slice;
 
     let mut conn = VTabConnection(db);
     let aux = aux as *mut T::Aux;
@@ -890,7 +890,7 @@ where
     C: VTabCursor,
 {
     use std::ffi::CStr;
-    use std::slice;
+//    use std::slice;
     use std::str;
     let idx_name = if idx_str.is_null() {
         None

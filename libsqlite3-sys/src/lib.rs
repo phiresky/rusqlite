@@ -1,4 +1,8 @@
 #![allow(non_snake_case, non_camel_case_types)]
+#![allow(invalid_value)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::redundant_static_lifetimes)]
+#![allow(clippy::type_complexity)]
 
 pub use self::error::*;
 

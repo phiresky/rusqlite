@@ -21,6 +21,9 @@
 // THE SOFTWARE
 //*****************************************************************************
 
+#![allow(deprecated, unused_imports)]
+#![allow(clippy::all)]
+
 //! Rusqlite is an ergonomic wrapper for using SQLite from Rust. It attempts to
 //! expose an interface similar to [rust-postgres](https://github.com/sfackler/rust-postgres).
 //!
