@@ -101,6 +101,10 @@ mod cache;
 #[cfg(feature = "collation")]
 mod collation;
 mod column;
+#[cfg(not(any(
+    feature = "loadable_extension",
+    feature = "loadable_extension_embedded"
+)))]
 pub mod config;
 #[cfg(any(feature = "functions", feature = "vtab"))]
 mod context;
@@ -749,6 +753,10 @@ impl Connection {
     ///
     /// The underlying SQLite database connection handle will not be closed when
     /// the returned connection is dropped/closed.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because improper use may impact the Connection.
     pub unsafe fn from_handle(db: *mut ffi::sqlite3) -> Result<Connection> {
         let db_path = db_filename(db);
         let db = InnerConnection::new(db, false);
@@ -876,7 +884,13 @@ impl InterruptHandle {
     pub fn interrupt(&self) {
         let db_handle = self.db_lock.lock().unwrap();
         if !db_handle.is_null() {
-            unsafe { ffi::sqlite3_interrupt(*db_handle) }
+            #[cfg(not(any(
+                feature = "loadable_extension",
+                feature = "loadable_extension_embedded"
+            )))] // no sqlite3_interrupt in a loadable extension
+            unsafe {
+                ffi::sqlite3_interrupt(*db_handle)
+            }
         }
     }
 }
