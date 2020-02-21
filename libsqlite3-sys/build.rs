@@ -342,6 +342,20 @@ mod bindings {
         "bindgen-bindings/bindgen_3.6.8",
         #[cfg(feature = "min_sqlite_version_3_7_16")]
         "bindgen-bindings/bindgen_3.7.16",
+        #[cfg(feature = "min_sqlite_version_3_8_2")]
+        "bindgen-bindings/bindgen_3.26.0", // require 3.8.2+, but just use 3.26.0
+        #[cfg(feature = "min_sqlite_version_3_9_0")]
+        "bindgen-bindings/bindgen_3.26.0", // require 3.9.0+, but just use 3.26.0
+        #[cfg(feature = "min_sqlite_version_3_10_0")]
+        "bindgen-bindings/bindgen_3.26.0", // require 3.10.0+, but just use 3.26.0
+        #[cfg(feature = "min_sqlite_version_3_13_0")]
+        "bindgen-bindings/bindgen_3.26.0", // require 3.13.0+, but just use 3.26.0
+        #[cfg(feature = "min_sqlite_version_3_20_0")]
+        "bindgen-bindings/bindgen_3.26.0", // require 3.20.0+, but just use 3.26.0
+        #[cfg(feature = "min_sqlite_version_3_22_0")]
+        "bindgen-bindings/bindgen_3.26.0", // require 3.22.0+, but just use 3.26.0
+        #[cfg(feature = "min_sqlite_version_3_26_0")]
+        "bindgen-bindings/bindgen_3.26.0",
         #[cfg(any(
             feature = "bundled_bindings",
             feature = "bundled",
@@ -352,7 +366,7 @@ mod bindings {
 
     pub fn write_to_out_dir(_header: HeaderLocation, out_path: &Path) {
         let in_path = format!(
-            "{}{}.rs",
+            "{}{}",
             PREBUILT_BINDGEN_PATHS[PREBUILT_BINDGEN_PATHS.len() - 1],
             prebuilt_bindgen_ext()
         );
@@ -504,7 +518,7 @@ pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_ro
 
             output.push_str(
 		r"
-// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build.rs - not by rust-bindgen)
+// sqlite3 API wrappers to support loadable extensions (Note: these were generated from build - not by rust-bindgen)
 
 ");
 
