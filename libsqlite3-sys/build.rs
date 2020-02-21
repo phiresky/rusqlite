@@ -366,7 +366,7 @@ mod bindings {
 
     pub fn write_to_out_dir(_header: HeaderLocation, out_path: &Path) {
         let in_path = format!(
-            "{}{}",
+            "{}{}.rs",
             PREBUILT_BINDGEN_PATHS[PREBUILT_BINDGEN_PATHS.len() - 1],
             prebuilt_bindgen_ext()
         );
