@@ -35,6 +35,7 @@ functions = ["libsqlite3-sys/min_sqlite_version_3_7_7"]
 trace = ["libsqlite3-sys/min_sqlite_version_3_6_23"]
 bundled = ["libsqlite3-sys/bundled", "modern_sqlite"]
 buildtime_bindgen = ["libsqlite3-sys/buildtime_bindgen"]
+non_threadsafe = [] # sqlite library was built without thread safety (-DSQLITE_THREADSAFE=0)
 limits = []
 hooks = []
 i128_blob = ["byteorder"]

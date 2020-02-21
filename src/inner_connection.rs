@@ -375,6 +375,28 @@ rusqlite was built against SQLite {} but the runtime SQLite version is {}. To fi
 static SQLITE_INIT: Once = Once::new();
 pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 
+#[cfg(not(any(
+    feature = "non_threadsafe",
+)))]
+static SQLITE_INIT: Once = ONCE_INIT;
+
+// threading mode checks are not possible when sqlite is built without thread
+// safety enabled (i.e. when compiled with -DSQLITE_THREADSAFE=0), which is
+// represented by the "non_threadsafe" feature.
+// note that this is necessary to compile sqlite/rusqlite for target platforms
+// without threading, such as wasm.
+// since there is no threading in this situation, it is safe for
+// ensure_safe_sqlite_threading_mode() to simply return Ok(()).
+#[cfg(any(
+    feature = "non_threadsafe",
+))]
+fn ensure_safe_sqlite_threading_mode() -> Result<()> {
+    Ok(())
+}
+
+#[cfg(not(any(
+    feature = "non_threadsafe",
+)))]
 fn ensure_safe_sqlite_threading_mode() -> Result<()> {
     // Ensure SQLite was compiled in thredsafe mode.
     if unsafe { ffi::sqlite3_threadsafe() == 0 } {
