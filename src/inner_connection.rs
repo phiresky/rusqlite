@@ -6,7 +6,7 @@ use std::path::Path;
 use std::ptr;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Once};
+use std::sync::{Arc, Mutex};
 
 use super::ffi;
 use super::{str_for_sqlite, str_to_cstring};
@@ -324,7 +324,7 @@ impl Drop for InnerConnection {
 }
 
 #[cfg(not(feature = "bundled"))]
-static SQLITE_VERSION_CHECK: Once = Once::new();
+static SQLITE_VERSION_CHECK: std::sync::Once = std::sync::Once::new();
 #[cfg(not(feature = "bundled"))]
 pub static BYPASS_VERSION_CHECK: AtomicBool = AtomicBool::new(false);
 
@@ -375,7 +375,7 @@ rusqlite was built against SQLite {} but the runtime SQLite version is {}. To fi
 #[cfg(not(any(
     target_arch = "wasm32"
 )))]
-static SQLITE_INIT: Once = Once::new();
+static SQLITE_INIT: std::sync::Once = std::sync::Once::new();
 
 pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 
