@@ -375,16 +375,26 @@ rusqlite was built against SQLite {} but the runtime SQLite version is {}. To fi
 #[cfg(not(any(
     feature = "loadable_extension",
     feature = "loadable_extension_embedded",
+    target_arch = "wasm32",
 )))]
-static SQLITE_INIT: std::sync::Once = std::sync::Once::new();
+static SQLITE_INIT: Once = Once::new();
+
+#[cfg(not(any(
+    feature = "loadable_extension",
+    feature = "loadable_extension_embedded",
+    target_arch = "wasm32",
+)))]
 pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 
 // threading mode checks are not possible when built as a loadable extension
 // since the sqlite3_threadsafe, sqlite3_config, and sqlite3_initialize
 // API calls are not available via the sqlite3_api_routines struct.
+// threading mode checks are also not necessary (and do not work) on target
+// platforms that do not have threading (such as webassembly)
 #[cfg(any(
     feature = "loadable_extension",
     feature = "loadable_extension_embedded",
+    target_arch = "wasm32",
 ))]
 fn ensure_safe_sqlite_threading_mode() -> Result<()> {
     Ok(())
@@ -393,6 +403,7 @@ fn ensure_safe_sqlite_threading_mode() -> Result<()> {
 #[cfg(not(any(
     feature = "loadable_extension",
     feature = "loadable_extension_embedded",
+    target_arch = "wasm32",
 )))]
 fn ensure_safe_sqlite_threading_mode() -> Result<()> {
     use crate::version::version_number;
