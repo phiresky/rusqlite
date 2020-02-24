@@ -9,6 +9,7 @@ use std::ptr;
 #[derive(Debug)]
 pub struct RawStatement(*mut ffi::sqlite3_stmt, bool);
 
+#[allow(clippy::missing-safety-doc)]
 impl RawStatement {
     pub fn new(stmt: *mut ffi::sqlite3_stmt, tail: bool) -> RawStatement {
         RawStatement(stmt, tail)
