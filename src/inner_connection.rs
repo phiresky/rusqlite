@@ -377,9 +377,6 @@ rusqlite was built against SQLite {} but the runtime SQLite version is {}. To fi
 )))]
 static SQLITE_INIT: Once = Once::new();
 
-#[cfg(not(any(
-    target_arch = "wasm32"
-)))]
 pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 
 // threading mode checks are not necessary (and do not work) on target
