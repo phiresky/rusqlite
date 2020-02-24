@@ -6,7 +6,7 @@ use std::path::Path;
 use std::ptr;
 use std::str;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
 
 use super::ffi;
 use super::{str_for_sqlite, str_to_cstring};
