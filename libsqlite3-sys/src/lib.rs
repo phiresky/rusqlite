@@ -49,12 +49,6 @@ pub enum Limit {
     SQLITE_LIMIT_WORKER_THREADS = 11,
 }
 
-#[allow(clippy::all)]
-mod bindings {
-    include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
-}
-pub use bindings::*;
-
 #[cfg(feature = "loadable_extension_embedded")]
 // bindings were built with loadable_extension_embedded:
 // define sqlite3_api as an extern since this code will be embedded
@@ -64,13 +58,20 @@ extern {
     pub static mut sqlite3_api: *mut sqlite3_api_routines;
 }
 
-#[cfg(all(feature = "loadable_extension", not(feature = "loadable_extension_embedded")))]
+//#[cfg(all(feature = "loadable_extension", not(feature = "loadable_extension_embedded")))]
+#[cfg(not(feature = "loadable_extension_embedded"))]
 // bindings were built with (non-embedded) loadable_extension:
 // we define our own (i.e. not extern) sqlite_api static
 // variable and export it publicly so that it is included in
 // our FFI (C) interface.
 #[no_mangle]
 pub static mut sqlite3_api: *mut sqlite3_api_routines = 0 as *mut sqlite3_api_routines;
+
+#[allow(clippy::all)]
+mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindgen.rs"));
+}
+pub use bindings::*;
 
 pub type sqlite3_index_constraint = sqlite3_index_info_sqlite3_index_constraint;
 pub type sqlite3_index_constraint_usage = sqlite3_index_info_sqlite3_index_constraint_usage;
