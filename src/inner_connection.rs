@@ -379,11 +379,6 @@ rusqlite was built against SQLite {} but the runtime SQLite version is {}. To fi
 )))]
 static SQLITE_INIT: Once = Once::new();
 
-#[cfg(not(any(
-    feature = "loadable_extension",
-    feature = "loadable_extension_embedded",
-    target_arch = "wasm32",
-)))]
 pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 
 // threading mode checks are not possible when built as a loadable extension
