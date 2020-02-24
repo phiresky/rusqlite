@@ -5,8 +5,8 @@ use std::os::raw::{c_char, c_int};
 use std::path::Path;
 use std::ptr;
 use std::str;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex, Once};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use super::ffi;
 use super::{str_for_sqlite, str_to_cstring};
@@ -377,7 +377,7 @@ rusqlite was built against SQLite {} but the runtime SQLite version is {}. To fi
     feature = "loadable_extension_embedded",
     target_arch = "wasm32",
 )))]
-static SQLITE_INIT: Once = Once::new();
+static SQLITE_INIT: std::sync::Once = std::sync::Once::new();
 
 pub static BYPASS_SQLITE_INIT: AtomicBool = AtomicBool::new(false);
 
