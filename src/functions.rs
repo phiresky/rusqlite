@@ -203,6 +203,10 @@ impl Context<'_> {
             }
         }
     }
+    pub fn get_connection(&self) -> Result<Connection> {
+        let handle = unsafe { ffi::sqlite3_context_db_handle(self.ctx) };
+        unsafe { Connection::from_handle(handle) }
+    }
 }
 
 /// Aggregate is the callback interface for user-defined aggregate function.
