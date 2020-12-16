@@ -205,6 +205,13 @@ impl Context<'_> {
         Ok(orig)
     }
 
+    /// Get the db connection handle via sqlite3_context_db_handle
+    /// https://www.sqlite.org/c3ref/context_db_handle.html
+    pub unsafe fn get_connection(&self) -> Result<Connection> {
+        let handle = ffi::sqlite3_context_db_handle(self.ctx);
+        Connection::from_handle(handle)
+    }
+
     /// Gets the auxilliary data that was associated with a given parameter via
     /// [`set_aux`](Context::set_aux). Returns `Ok(None)` if no data has been associated, and
     /// Ok(Some(v)) if it has. Returns an error if the requested type does not
